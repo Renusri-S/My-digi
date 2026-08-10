@@ -26,6 +26,17 @@ Build a production-quality digital project marketplace for college students with
 - Added polished responsive styling, motion, reduced-motion support, toasts, skeleton/empty states, unique data-testid coverage, and mobile overflow validation.
 - Added canonical studium-labs detail alias to the Neural Notes seed project.
 
+## What is implemented (2026-02-10 — Supabase integration)
+- Wired **Supabase Auth** end-to-end using the publishable key: email/password sign-in, sign-up, Google OAuth entry point, session persistence, and automatic profile fetch via `useAuth` React context.
+- Added `/app/schema.sql` — full Postgres schema (profiles, categories, projects, orders, order_items, purchases, analytics_events, site_settings), RLS policies, admin bootstrap for `renusrisiva@gmail.com`, storage buckets (`thumbnails` public, `source-zips` private), and idempotent seed of the six sample projects. To be run once in Supabase SQL Editor.
+- **Projects catalogue and detail now fetch from Supabase** first, falling back to the FastAPI/MongoDB demo seed until the SQL migration is executed.
+- **FastAPI backend verifies Supabase JWTs** via the project's JWKS endpoint (`/auth/v1/.well-known/jwks.json`), with legacy HS256 fallback. New `/api/me` endpoint returns the authenticated user's identity + admin flag. Admin routes require the configured `ADMIN_EMAIL`.
+- **Student dashboard** now loads real purchases from the `purchases` table (RLS-scoped). Profile page lets users edit `full_name` and `mobile` (updates `profiles` table under RLS).
+- **Admin dashboard** protected by `renusrisiva@gmail.com` gate. Admin can list, create, edit, delete, publish/archive projects with a full form (all fields including features/deliverables/learning outcomes, discount, accent, featured/popular flags).
+- Razorpay is intentionally **still a dummy** — `/api/payments/create-order` returns `pending_gateway_credentials` with server-computed prices and never fakes success. Ready to activate once `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are added to backend `.env`.
+- Signed downloads endpoint returns `503 — add SUPABASE_SECRET_KEY to enable` until the service-role/secret key is provided.
+- Added legal pages: `/privacy`, `/terms`, `/refund-policy`.
+
 ## Prioritized backlog
 P0
 - Connect Supabase URL/anon key and implement real email/password + Google session handling.
