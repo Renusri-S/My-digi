@@ -7,9 +7,20 @@ import { Toaster, toast } from 'sonner';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { supabase, supabaseEnabled } from '@/lib/supabase';
 import { listProjects, getProject, listUserPurchases, hasPurchased, upsertProject, deleteProject } from '@/lib/projectsRepo';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 const money = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+
+async function startDownload(slug) {
+  try {
+    const { data } = await apiPost(`/downloads/${slug}`, {});
+    if (data?.url) { window.open(data.url, '_blank', 'noopener'); toast.success('Signed download link ready'); }
+    else toast.error('Could not create a signed link.');
+  } catch (e) {
+    const msg = e?.response?.data?.detail || e?.message || 'Download failed';
+    toast.error(msg);
+  }
+}
 
 // ---------- Data hooks ----------
 function useProjects(filters) {
@@ -320,7 +331,7 @@ function Detail({ onAdd }) {
                 <del>{project.discount_price ? money(project.price) : ''}</del>
               </div>
               {owned ? (
-                <Link to="/dashboard" className="primary-btn" data-testid="detail-open-project">Open project <ArrowRight size={16} /></Link>
+                <button className="primary-btn" onClick={() => startDownload(project.slug)} data-testid="detail-download">Download source <ArrowRight size={16} /></button>
               ) : (
                 <button className="primary-btn" onClick={() => onAdd(project)} data-testid="detail-add-to-cart">Add to cart <ShoppingBag size={16} /></button>
               )}
@@ -604,7 +615,8 @@ function Dashboard() {
                 <div className="purchase-row" key={row.id}>
                   <div className="mini-visual" style={{ '--accent': row.project?.accent || '#244B74' }}><Zap size={18} /></div>
                   <div><b>{row.project?.title}</b><span>Purchased · ready to access</span></div>
-                  <Link to={`/projects/${row.project?.slug}`} className="outline-btn" data-testid={`open-purchase-${row.id}`}>Open project <ArrowRight size={14} /></Link>
+                  <button className="outline-btn" onClick={() => startDownload(row.project?.slug)} data-testid={`download-purchase-${row.id}`}>Download <ArrowRight size={14} /></button>
+                  <Link to={`/projects/${row.project?.slug}`} className="outline-btn" data-testid={`open-purchase-${row.id}`}>Open <ArrowRight size={14} /></Link>
                 </div>
               ))
             )}

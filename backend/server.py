@@ -10,6 +10,7 @@ import os, uuid, logging
 
 import jwt
 from jwt import PyJWKClient
+from supabase import create_client as create_supabase_client
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,9 +20,12 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
+SUPABASE_SECRET_KEY = os.environ.get('SUPABASE_SECRET_KEY') or ''
 JWT_AUDIENCE = os.environ.get('SUPABASE_JWT_AUDIENCE', 'authenticated')
 ADMIN_EMAIL = (os.environ.get('ADMIN_EMAIL') or '').lower()
 JWKS_CLIENT = PyJWKClient(f'{SUPABASE_URL}/auth/v1/.well-known/jwks.json') if SUPABASE_URL else None
+SUPA_ADMIN = create_supabase_client(SUPABASE_URL, SUPABASE_SECRET_KEY) if (SUPABASE_URL and SUPABASE_SECRET_KEY) else None
+DOWNLOAD_TTL_SECONDS = 300  # 5 minutes
 
 log = logging.getLogger('studium')
 logging.basicConfig(level=logging.INFO)
@@ -103,7 +107,8 @@ class VerifyPaymentRequest(BaseModel):
 @api_router.get('/')
 async def root():
     return {'message': 'Studium Labs API', 'status': 'ready',
-            'supabase_configured': bool(SUPABASE_URL)}
+            'supabase_configured': bool(SUPABASE_URL),
+            'signed_downloads_enabled': bool(SUPA_ADMIN)}
 
 
 @api_router.get('/projects')
@@ -199,22 +204,105 @@ async def payment_webhook():
     return {'status': 'accepted', 'message': 'Webhook signature verification boundary is ready.'}
 
 
-# ---------- Purchases / downloads (require secret key on server later) ----------
+# ---------- Purchases / downloads ----------
+class GrantAccessRequest(BaseModel):
+    project_slug: str
+    user_email: str
+
+
 @api_router.get('/purchases')
 async def purchases(user=Depends(current_user)):
-    # With current Supabase publishable-key-only setup, purchases are fetched directly from Supabase (RLS)
-    # in the frontend using the user's session. Return empty here as a safe fallback.
-    return []
+    if not SUPA_ADMIN:
+        return []
+    try:
+        res = (SUPA_ADMIN.table('purchases')
+               .select('id, created_at, project:projects(id, slug, title, category, accent, source_zip_path)')
+               .eq('buyer_id', user['sub'])
+               .order('created_at', desc=True)
+               .execute())
+        return res.data or []
+    except Exception as e:
+        log.warning('purchases fetch failed: %s', e)
+        return []
 
 
 @api_router.post('/downloads/{project_slug}')
 async def issue_download(project_slug: str, user=Depends(current_user)):
-    # A signed URL to source-zips bucket requires the Supabase secret key, which has
-    # not been provided. Purchase entitlement will still be verified before signing.
-    raise HTTPException(
-        503,
-        'Signed downloads are ready to enable — add SUPABASE_SECRET_KEY to backend/.env to activate.',
-    )
+    if not SUPA_ADMIN:
+        raise HTTPException(503, 'Signed downloads are disabled — SUPABASE_SECRET_KEY is missing on the server.')
+
+    uid = user['sub']
+
+    # 1. Look up project by slug
+    try:
+        proj_res = SUPA_ADMIN.table('projects').select('id, slug, title, source_zip_path').eq('slug', project_slug).maybe_single().execute()
+    except Exception as e:
+        log.warning('project lookup failed: %s', e)
+        raise HTTPException(500, 'Project lookup failed. Did you run schema.sql in Supabase?')
+    project = proj_res.data if proj_res else None
+    if not project:
+        raise HTTPException(404, 'Project not found')
+
+    # 2. Check purchase entitlement (buyer_id must match trusted sub)
+    ent = (SUPA_ADMIN.table('purchases')
+           .select('id').eq('buyer_id', uid).eq('project_id', project['id'])
+           .limit(1).execute())
+    if not ent.data:
+        raise HTTPException(403, 'Purchase entitlement required for this project.')
+
+    # 3. Check source zip exists
+    path = project.get('source_zip_path')
+    if not path:
+        raise HTTPException(404, 'Source archive is not uploaded yet for this project.')
+
+    # 4. Create a short-lived signed URL from the private bucket
+    try:
+        signed = SUPA_ADMIN.storage.from_('source-zips').create_signed_url(path, DOWNLOAD_TTL_SECONDS)
+    except Exception as e:
+        log.error('signed url creation failed: %s', e)
+        raise HTTPException(500, 'Could not issue a signed URL. Check that the source-zips bucket and object exist.')
+
+    url = signed.get('signedURL') or signed.get('signedUrl') or signed.get('signed_url')
+    if not url:
+        raise HTTPException(500, 'Signed URL response was empty.')
+
+    # 5. Best-effort audit trail
+    try:
+        SUPA_ADMIN.table('analytics_events').insert({
+            'event_name': 'download_issued',
+            'project_id': project['id'],
+            'user_id': uid,
+            'metadata': {'ttl': DOWNLOAD_TTL_SECONDS, 'path': path},
+        }).execute()
+    except Exception:
+        pass
+
+    return {'url': url, 'expires_in': DOWNLOAD_TTL_SECONDS, 'project_slug': project['slug']}
+
+
+@api_router.post('/admin/grant-access')
+async def admin_grant_access(payload: GrantAccessRequest, user=Depends(require_admin)):
+    """Admin utility — grant a student free access to a project (useful before Razorpay is enabled)."""
+    if not SUPA_ADMIN:
+        raise HTTPException(503, 'SUPABASE_SECRET_KEY is missing on the server.')
+
+    # Look up target user
+    user_res = SUPA_ADMIN.table('profiles').select('id, email').ilike('email', payload.user_email).maybe_single().execute()
+    if not user_res or not user_res.data:
+        raise HTTPException(404, f'No student profile found for {payload.user_email}. Ask them to sign up first.')
+    buyer_id = user_res.data['id']
+
+    proj_res = SUPA_ADMIN.table('projects').select('id, slug').eq('slug', payload.project_slug).maybe_single().execute()
+    if not proj_res or not proj_res.data:
+        raise HTTPException(404, 'Project not found')
+    project_id = proj_res.data['id']
+
+    try:
+        SUPA_ADMIN.table('purchases').insert({'buyer_id': buyer_id, 'project_id': project_id}).execute()
+    except Exception as e:
+        # Likely unique_violation for existing entitlement.
+        return {'status': 'already_granted', 'detail': str(e)}
+    return {'status': 'granted', 'buyer_id': buyer_id, 'project_slug': payload.project_slug}
 
 
 app.include_router(api_router)
