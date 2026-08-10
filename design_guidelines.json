@@ -1,0 +1,106 @@
+{
+  "project": "Digital Project Marketplace MVP",
+  "context": "Hybrid full-stack marketplace and admin dashboard",
+  "theme": {
+    "default": "light",
+    "alternate": "dark-ready",
+    "reason": "Students need confidence and scanability during discovery and checkout; a warm light canvas makes downloadable academic products feel approachable while an ink-dark admin mode supports focus."
+  },
+  "discovery": {
+    "audience": ["college students", "student developers", "project evaluators", "platform owner/admin"],
+    "key_tasks": ["discover projects", "filter by discipline and stack", "understand deliverables", "purchase securely", "download protected assets", "manage catalog and orders"],
+    "success_actions": ["open project detail", "add to cart", "complete Razorpay checkout", "download purchased bundle", "admin publishes a project"],
+    "emotional_tone": "credible, curious, practical, quietly futuristic",
+    "content_strategy": "Lead with outcomes and proof: what the student can run, learn, submit, and present. Use concise metadata before long descriptions."
+  },
+  "design_directions": [
+    {"name":"Archive / Signal", "probability":0.34, "description":"Swiss editorial marketplace fused with technical documentation and library archive cues. Warm paper canvas, signal orange actions, dark ink typography, visible system metadata.", "best_for":"primary student marketplace"},
+    {"name":"Studio Bench", "probability":0.24, "description":"Workshop catalog fused with university lab notebook and premium software store. Tactile borders, annotated previews, earthy blue and clay accents.", "best_for":"project detail and learning content"},
+    {"name":"Launchpad", "probability":0.18, "description":"Mission-control dashboard fused with academic planner and product hunt. Dense but calm metrics, red-orange status markers, asymmetric featured project blocks.", "best_for":"student dashboard"},
+    {"name":"Night Lab", "probability":0.14, "description":"Dark technical console fused with cinematic editorial typography and code editor surfaces. Reserve for admin and power-user analytics, not checkout.", "best_for":"admin analytics"},
+    {"name":"Field Notes", "probability":0.10, "description":"Documentary learning journal fused with modular ecommerce catalog. Generous whitespace, image-led stories, handwritten-style accent used sparingly.", "best_for":"campaigns and educational video discovery"}
+  ],
+  "typography": {
+    "heading_font": "IBM Plex Sans",
+    "heading_fallback": "Arial, sans-serif",
+    "body_font": "IBM Plex Sans",
+    "mono_font": "IBM Plex Mono",
+    "rationale": "A humanist technical voice feels trustworthy without defaulting to Inter. Use 800 weight for impact and 400/450 body weight for calm reading.",
+    "rules": {"h1":"text-4xl sm:text-5xl lg:text-6xl tracking-tighter leading-none", "h2":"text-2xl sm:text-3xl lg:text-4xl tracking-tight", "h3":"text-xl sm:text-2xl", "body":"text-sm sm:text-base leading-relaxed", "label":"text-xs uppercase tracking-[0.2em] font-semibold"}
+  },
+  "colors": {
+    "archetype":"Swiss & high-contrast with warm paper twist",
+    "palette": {"paper":"#F6F3EC", "surface":"#FFFDF8", "ink":"#17212B", "muted":"#65717A", "line":"#D9D6CD", "signal":"#E4572E", "signal_dark":"#B83A20", "academic_blue":"#244B74", "success":"#2F6B4F", "warning":"#A66A16"},
+    "forbidden":"#7351B7 and teal dashboard palettes; never use pure #000000 or #808080",
+    "usage":"Use signal only for CTA, active filters, price emphasis, and status. Keep 85-90% surfaces neutral. No full-screen gradients."
+  },
+  "visual_enhancers": {
+    "texture":"Subtle CSS grain using a low-opacity data URI or pseudo-element; never reduce text contrast.",
+    "surfaces":"Flat paper surfaces with 1px tinted borders; use glass only for sticky nav with bg-white/85 backdrop-blur-xl border-white/60.",
+    "decorative_language":"Thin measurement ticks, category index numbers, dotted rules, cropped product screenshots, and small mono annotations.",
+    "custom_scrollbar":"Use a 6px thumb in #B7B4AA on #F6F3EC; no gutter.",
+    "avoid":"generic hero gradients, centered-everything, excessive rounded cards, emoji icons, placeholder image URLs."
+  },
+  "grids": {
+    "marketplace":"Tetris grid: grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8; featured project spans 8 columns and 2 rows, supporting modules span 4 columns, leave intentional breathing cells.",
+    "catalog":"grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6; cards are flat direct grid children with image, title, stack, deliverables, price and CTA.",
+    "admin":"High-density grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4; KPI col-span-1, primary analytics col-span-2 row-span-2, activity feed col-span-1 row-span-2.",
+    "rule":"Grid items must be direct children; animation wrappers must carry the grid classes. Use align-items:start and h-full only where matching row height is intentional."
+  },
+  "layouts": {
+    "global_nav":"Visible desktop nav with brand, Projects, Categories, How it works, Resources, cart and primary CTA. Solid paper or opaque glass background, z-50 when sticky.",
+    "landing":"Asymmetric editorial hero: left-aligned headline and search, right-side stacked project preview and outcome index. Follow with category rail, featured projects, three-step process, trust strip, FAQ and dark contrast footer.",
+    "catalog":"Search/filter rail on desktop and Shadcn Sheet on mobile; sort via Shadcn DropdownMenu, never native select. Preserve filter chips and result count.",
+    "detail":"Product title, discipline, price and purchase CTA first; tabs for Overview, What is included, Setup, Learning path, Reviews. Show preview gallery, compatibility, support and related projects.",
+    "checkout":"Two-column desktop contract: order summary and secure payment panel. Explicit deliverables, license terms, refund policy and payment state. Never show success until backend verifies payment.",
+    "student_dashboard":"Sidebar with Purchases, Downloads, Learning, Profile; progress and recent downloads in dense but spacious modules.",
+    "admin":"Protected sidebar routes Overview, Projects, Categories, Orders, Users, Analytics, SEO, Settings. Use tables, filters, empty states and activity timeline; no excessive cards."
+  },
+  "components": {
+    "component_path":"/app/frontend/src/components/ui/",
+    "preferred":"Use existing Button, Input, Badge, Tabs, Sheet, DropdownMenu, Dialog, Table, Skeleton, Progress, Tooltip and Sonner components. Customize classes to match the system.",
+    "new_js_components":["MarketplaceNav.js","ProjectCard.js","FilterRail.js","ProjectDeliverables.js","PurchasePanel.js","ProtectedDownloadButton.js","AdminSidebar.js","AnalyticsOverview.js"],
+    "interaction_rules":"Every interactive element has hover, active, focus-visible and pressed states with explicit text color. Use Sonner for cart, auth, payment and download feedback."
+  },
+  "motion": {
+    "entrance":"Stagger catalog cards 50ms with opacity and translateY(8px).",
+    "hover":"Project cards lift -translate-y-1 with border-color and shadow transition; buttons use transform scale(0.98) on press.",
+    "loading":"Use skeleton blocks for images, metadata and tables; never flash empty layout.",
+    "scroll":"Optional Lenis only on marketing/landing route; do not add smooth scrolling to checkout or admin.",
+    "reduced_motion":"@media (prefers-reduced-motion: reduce) disables parallax, stagger and transform animation; keep opacity/state feedback. Use specific transitions, never transition-all."
+  },
+  "accessibility": {
+    "contrast":"Normal text >=4.5:1, large text >=3:1; test signal buttons with white text and signal_dark for hover.",
+    "keyboard":"Visible high-contrast focus ring, logical tab order, Escape closes dialogs/sheets, focus trap through Radix primitives.",
+    "semantics":"Use landmarks, labelled inputs, table captions, aria-live for payment/download status, alt text for all project imagery.",
+    "testing":"All buttons, links, inputs, menus, balances, errors, purchase/download confirmations and key project metadata require data-testid in kebab-case."
+  },
+  "media": {
+    "strategy":"Use project screenshots, diagrams and short video thumbnails as educational proof. Images must remain below 80vh on mobile. Demo references are replaceable and should move to signed/private asset API before production.",
+    "image_urls":[
+      {"category":"hero/student-learning", "url":"https://images.unsplash.com/photo-1541178735493-479c1a27ed24?crop=entropy&cs=srgb&fm=jpg&q=85", "description":"Student working on laptop; use as editorial hero or learning story image."},
+      {"category":"catalog/student-coding", "url":"https://images.unsplash.com/photo-1583037825390-a23eee53f6ef?crop=entropy&cs=srgb&fm=jpg&q=85", "description":"Student coding at laptop; use for full-stack or AI project preview."},
+      {"category":"learning/video-thumbnail", "url":"https://images.unsplash.com/photo-1573496129661-bd7fcc7e532b?crop=entropy&cs=srgb&fm=jpg&q=85", "description":"Student learning with headphones; use for video lesson module."},
+      {"category":"fallback/product-detail", "url":"https://images.unsplash.com/photo-1573496799175-606e47a7d4f6?crop=entropy&cs=srgb&fm=jpg&q=85", "description":"Laptop detail; use as replaceable demo product visual."}
+    ],
+    "protection":"Do not expose private source-code URLs in frontend. Request download entitlement from FastAPI and consume short-lived signed URLs."
+  },
+  "3d_libraries": {"decision":"No 3D required for MVP; clarity beats immersion for academic product purchase.", "optional":"If a later marketing hero needs depth, lazy-load React Three Fiber with Suspense and transparent background; do not block catalog or checkout."},
+  "backend_contracts": {
+    "auth":"Supabase email/password integration point with Google OAuth prepared; client only receives session, never service role key.",
+    "payments":"FastAPI creates Razorpay order server-side, verifies signature server-side, persists payment state, then unlocks entitlement. No fake success flow.",
+    "downloads":"GET /api/purchases/{id}/downloads returns authorized short-lived signed URLs after entitlement check.",
+    "admin":"Require server-side role/admin email allowlist or Supabase claim; admin routes must fail closed.",
+    "seo":"Per-route metadata contract for title, description, canonical and project structured data."
+  },
+  "general_ui_ux_design_guidelines": {
+    "spacing":"Use generous p-6/p-8/p-12 sections and 2-3x typical whitespace; bordered containers always have internal padding.",
+    "responsive":"Mobile-first. Desktop nav links visible; hamburger only mobile. Avoid images over 80vh on mobile.",
+    "headers":"Never use fully transparent backgrounds behind content. Use opaque paper or glass with blur and border.",
+    "buttons":"Use sharp or modestly pill-shaped buttons with clear primary hierarchy; primary color limited to key actions.",
+    "states":"Build loading, error, empty, disabled, hover, focus, active and success states for every major flow.",
+    "code":"Files are JavaScript/JSX, not TypeScript/TSX. Keep API adapters replaceable and avoid hardcoded secrets.",
+    "anti_slop":"Do not center the app container, use generic gradients, Inter headings, uniform equal-card grids, or emoji as icons."
+  },
+  "instructions_to_main_agent":"Implement Archive / Signal as the default direction. Preserve the existing FastAPI integration shape and add Supabase/Razorpay service adapters rather than mocking production flows. Seed six realistic projects across AI/ML, Generative AI, Computer Vision, Full Stack, Data Science and NLP. Add data-testid to all interactive and key informational elements."
+}
