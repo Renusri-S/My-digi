@@ -59,6 +59,7 @@ create table if not exists public.projects (
   accent text default '#244B74',
   thumbnail_path text,
   preview_video_path text,
+  youtube_url text,
   source_zip_path text,
   status public.project_status not null default 'published',
   featured boolean not null default false,
