@@ -10,8 +10,8 @@ const AuthContext = createContext({
   signIn: async () => ({ error: 'auth disabled' }),
   signUp: async () => ({ error: 'auth disabled' }),
   signInWithGoogle: async () => ({ error: 'auth disabled' }),
-  signOut: async () => {},
-  refreshProfile: async () => {},
+  signOut: async () => { },
+  refreshProfile: async () => { },
 });
 
 export function AuthProvider({ children }) {
@@ -85,8 +85,10 @@ export function AuthProvider({ children }) {
     if (user?.id) await loadProfile(user.id);
   }, [user, loadProfile]);
 
-  const value = { session, user, profile, loading, isAdmin,
-    signIn, signUp, signInWithGoogle, signOut, refreshProfile };
+  const value = {
+    session, user, profile, loading, isAdmin,
+    signIn, signUp, signInWithGoogle, signOut, refreshProfile
+  };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

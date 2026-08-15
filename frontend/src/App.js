@@ -412,6 +412,20 @@ function Cart({ items, setItems }) {
   );
 }
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 function Checkout({ items }) {
   const [busy, setBusy] = useState(false);
   const { session, user } = useAuth();
@@ -419,23 +433,88 @@ function Checkout({ items }) {
     if (!user) { toast.error('Sign in to begin secure checkout.'); return; }
     setBusy(true);
     try {
-      const res = await apiGet('/'); // ping backend
-      void res;
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error('Razorpay SDK failed to load. Are you offline?');
+        setBusy(false);
+        return;
+      }
       const token = session?.access_token;
       const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/payments/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ project_slugs: items.map(i => i.slug) }),
       });
+      if (!r.ok) {
+        const errBody = await r.json().catch(() => ({}));
+        throw new Error(errBody.detail || 'Failed to create order on server');
+      }
       const body = await r.json();
       if (body.status === 'pending_gateway_credentials') {
         toast('Razorpay is not configured — no payment was taken. Order total verified: ' + money(body.amount / 100));
-      } else {
-        toast.success('Order created. Opening Razorpay…');
+        setBusy(false);
+        return;
       }
-    } catch (_e) {
-      toast.error('Checkout could not start. Please try again.');
-    } finally { setBusy(false); }
+      toast.success('Order created. Opening Razorpay…');
+      
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_TQ2d5SX8BCSkS2',
+        amount: body.amount,
+        currency: body.currency || 'INR',
+        name: 'Studium Labs',
+        description: 'Digital Project Purchase',
+        order_id: body.razorpay_order_id,
+        handler: async function (response) {
+          setBusy(true);
+          try {
+            const verifyRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/payments/verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                order_id: body.order_id
+              })
+            });
+            const verifyBody = await verifyRes.json();
+            if (verifyRes.ok && verifyBody.status === 'success') {
+              toast.success('Payment verified and completed successfully!');
+              window.location.href = '/dashboard/purchases';
+            } else {
+              toast.error(verifyBody.detail || 'Payment verification failed.');
+            }
+          } catch (e) {
+            toast.error('An error occurred during payment verification.');
+          } finally {
+            setBusy(false);
+          }
+        },
+        prefill: {
+          name: user.email?.split('@')[0],
+          email: user.email,
+        },
+        theme: {
+          color: '#E4572E',
+        },
+        modal: {
+          ondismiss: function () {
+            toast('Payment cancelled by user.');
+            setBusy(false);
+          }
+        }
+      };
+      
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (response) {
+        toast.error(`Payment failed: ${response.error.description}`);
+        setBusy(false);
+      });
+      rzp.open();
+    } catch (e) {
+      toast.error(e.message || 'Checkout could not start. Please try again.');
+      setBusy(false);
+    }
   };
   return (
     <Shell cartCount={items.length}>
