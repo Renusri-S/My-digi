@@ -48,7 +48,7 @@ export async function listUserPurchases(userId) {
   if (!supabaseEnabled || !userId) return [];
   const { data } = await supabase
     .from('purchases')
-    .select('id, created_at, project:projects(id,slug,title,category,accent,thumbnail_path)')
+    .select('id, created_at, project:projects(id,slug,title,category,accent,thumbnail_path,youtube_url,explanation_document_path,source_zip_path)')
     .eq('buyer_id', userId)
     .order('created_at', { ascending: false });
   return data || [];

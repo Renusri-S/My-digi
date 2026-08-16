@@ -60,6 +60,7 @@ create table if not exists public.projects (
   thumbnail_path text,
   preview_video_path text,
   youtube_url text,
+  explanation_document_path text,
   source_zip_path text,
   status public.project_status not null default 'published',
   featured boolean not null default false,

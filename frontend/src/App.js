@@ -11,10 +11,26 @@ import { apiGet, apiPost } from '@/lib/api';
 
 const money = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 
-async function startDownload(slug) {
+function getYoutubeEmbedUrl(url) {
+  if (!url) return null;
+  let videoId = '';
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  if (match && match[2].length === 11) {
+    videoId = match[2];
+  } else {
+    return url;
+  }
+  return `https://www.youtube.com/embed/${videoId}`;
+}
+
+async function startDownload(slug, fileType = 'source_zip') {
   try {
-    const { data } = await apiPost(`/downloads/${slug}`, {});
-    if (data?.url) { window.open(data.url, '_blank', 'noopener'); toast.success('Signed download link ready'); }
+    const { data } = await apiPost(`/downloads/${slug}?file_type=${fileType}`, {});
+    if (data?.url) {
+      window.open(data.url, '_blank', 'noopener');
+      toast.success(`${fileType === 'explanation_doc' ? 'Explanation document' : 'Source zip'} download link ready`);
+    }
     else toast.error('Could not create a signed link.');
   } catch (e) {
     const msg = e?.response?.data?.detail || e?.message || 'Download failed';
@@ -310,11 +326,26 @@ function Detail({ onAdd }) {
           <Link to="/projects" data-testid="detail-back-projects">Projects</Link><ChevronRight size={13} /><span>{project.category}</span>
         </div>
         <section className="detail-hero">
-          <div className="detail-visual" style={{ '--accent': project.accent || '#244B74' }}>
-            <div className="visual-grid"></div>
-            <span className="detail-code">{(project.technologies || []).join('  /  ')}</span>
-            <div className="detail-play"><Play size={23} fill="currentColor" /></div>
-            <span className="preview-label">30-SECOND PREVIEW</span>
+          <div className="detail-visual" style={{ '--accent': project.accent || '#244B74', overflow: 'hidden', position: 'relative' }}>
+            {project.youtube_url ? (
+              <iframe
+                width="100%"
+                height="100%"
+                src={getYoutubeEmbedUrl(project.youtube_url)}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                style={{ border: 'none', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 5 }}
+              />
+            ) : (
+              <>
+                <div className="visual-grid"></div>
+                <span className="detail-code">{(project.technologies || []).join('  /  ')}</span>
+                <div className="detail-play"><Play size={23} fill="currentColor" /></div>
+                <span className="preview-label">30-SECOND PREVIEW</span>
+              </>
+            )}
           </div>
           <div className="detail-copy">
             <span className="section-kicker">{project.category} / {project.complexity}</span>
@@ -691,11 +722,31 @@ function Dashboard() {
               <div className="empty-state" data-testid="dashboard-empty"><ShoppingBag size={26} /><h3>No purchases yet</h3><p>Browse the library to find your next project.</p></div>
             ) : (
               purchases.map((row) => (
-                <div className="purchase-row" key={row.id}>
-                  <div className="mini-visual" style={{ '--accent': row.project?.accent || '#244B74' }}><Zap size={18} /></div>
-                  <div><b>{row.project?.title}</b><span>Purchased · ready to access</span></div>
-                  <button className="outline-btn" onClick={() => startDownload(row.project?.slug)} data-testid={`download-purchase-${row.id}`}>Download <ArrowRight size={14} /></button>
-                  <Link to={`/projects/${row.project?.slug}`} className="outline-btn" data-testid={`open-purchase-${row.id}`}>Open <ArrowRight size={14} /></Link>
+                <div className="purchase-row" key={row.id} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px 0', borderBottom: '1px solid var(--line)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 12 }}>
+                    <div className="mini-visual" style={{ '--accent': row.project?.accent || '#244B74', flexShrink: 0 }}><Zap size={18} /></div>
+                    <div style={{ flexGrow: 1 }}>
+                      <b>{row.project?.title}</b>
+                      <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{row.project?.category || 'Project'} · Purchased</span>
+                    </div>
+                    <Link to={`/projects/${row.project?.slug}`} className="outline-btn" data-testid={`open-purchase-${row.id}`}>Project details <ArrowRight size={14} /></Link>
+                  </div>
+                  {row.project?.youtube_url && (
+                    <div style={{ marginTop: 8, width: '100%', maxWidth: 480, height: 270, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line)' }}>
+                      <iframe
+                        width="100%"
+                        height="100%"
+                        src={getYoutubeEmbedUrl(row.project.youtube_url)}
+                        title="Walkthrough"
+                        frameBorder="0"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 5 }}>
+                    <button className="primary-btn" onClick={() => startDownload(row.project?.slug, 'source_zip')} data-testid={`download-purchase-${row.id}`} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Source Code <ArrowRight size={14} /></button>
+                    <button className="outline-btn" onClick={() => startDownload(row.project?.slug, 'explanation_doc')} data-testid={`download-doc-${row.id}`} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Explanation Doc <ArrowRight size={14} /></button>
+                  </div>
                 </div>
               ))
             )}
@@ -844,6 +895,7 @@ function AdminProjectForm({ mode }) {
     suitable_years: '', technologies: '', features: '', deliverables: '', learning_outcomes: '',
     price: 999, discount_price: 799, accent: '#244B74',
     featured: false, popular: false, status: 'published',
+    youtube_url: '', explanation_document_path: '', source_zip_path: '',
   });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(mode === 'edit');
@@ -859,6 +911,9 @@ function AdminProjectForm({ mode }) {
             features: (p.features || []).join('\n'),
             deliverables: (p.deliverables || []).join('\n'),
             learning_outcomes: (p.learning_outcomes || []).join('\n'),
+            youtube_url: p.youtube_url || '',
+            explanation_document_path: p.explanation_document_path || '',
+            source_zip_path: p.source_zip_path || '',
           });
         }
       }).finally(() => setLoading(false));
@@ -867,6 +922,29 @@ function AdminProjectForm({ mode }) {
   }, [mode, slug]);
 
   const set = (k, v) => setForm({ ...form, [k]: v });
+
+  const handleUpload = async (e, fieldName, folder) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!supabaseEnabled) {
+      toast.error('Supabase is not configured yet.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const filePath = `${folder}/${fileName}`;
+      const { data, error } = await supabase.storage.from('source-zips').upload(filePath, file);
+      if (error) throw error;
+      set(fieldName, filePath);
+      toast.success(`${file.name} uploaded successfully!`);
+    } catch (err) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!supabaseEnabled) { toast.error('Run schema.sql in Supabase first.'); return; }
@@ -881,6 +959,9 @@ function AdminProjectForm({ mode }) {
       learning_outcomes: form.learning_outcomes.split('\n').map(s => s.trim()).filter(Boolean),
       price: Number(form.price), discount_price: form.discount_price ? Number(form.discount_price) : null,
       accent: form.accent, featured: !!form.featured, popular: !!form.popular, status: form.status,
+      youtube_url: form.youtube_url ? form.youtube_url.trim() : null,
+      explanation_document_path: form.explanation_document_path ? form.explanation_document_path.trim() : null,
+      source_zip_path: form.source_zip_path ? form.source_zip_path.trim() : null,
       updated_at: new Date().toISOString(),
     };
     try {
@@ -901,7 +982,8 @@ function AdminProjectForm({ mode }) {
         <label>Slug<input required value={form.slug} onChange={e => set('slug', e.target.value)} data-testid="admin-project-slug" /></label>
         <label>Short description<input required value={form.short_description} onChange={e => set('short_description', e.target.value)} data-testid="admin-project-short-description" /></label>
         <label>Long description<textarea rows={4} value={form.description} onChange={e => set('description', e.target.value)} className="w-full border p-3" style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: 13 }} data-testid="admin-project-description" /></label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 17 }}>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 17, marginBottom: 15 }}>
           <label>Category
             <select value={form.category} onChange={e => set('category', e.target.value)} style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: 13 }} data-testid="admin-project-category">
               {['AI / ML','Generative AI','Computer Vision','Full Stack','Data Science','NLP'].map(c => <option key={c}>{c}</option>)}
@@ -913,26 +995,61 @@ function AdminProjectForm({ mode }) {
             </select>
           </label>
         </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 17, marginBottom: 15 }}>
+          <label>Project Zip Path
+            <input value={form.source_zip_path} onChange={e => set('source_zip_path', e.target.value)} placeholder="source_zips/file.zip" data-testid="admin-project-zip-path" />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>Or select zip to upload:</span>
+            <input type="file" accept=".zip" onChange={e => handleUpload(e, 'source_zip_path', 'source_zips')} style={{ marginTop: 2, fontSize: '0.85rem' }} />
+          </label>
+          <label>Explanation Doc Path
+            <input value={form.explanation_document_path} onChange={e => set('explanation_document_path', e.target.value)} placeholder="explanation_docs/file.pdf" data-testid="admin-project-doc-path" />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>Or select document to upload:</span>
+            <input type="file" accept=".pdf,.doc,.docx" onChange={e => handleUpload(e, 'explanation_document_path', 'explanation_docs')} style={{ marginTop: 2, fontSize: '0.85rem' }} />
+          </label>
+        </div>
+
+        <label>YouTube URL (optional)
+          <input value={form.youtube_url} onChange={e => set('youtube_url', e.target.value)} placeholder="https://www.youtube.com/watch?v=..." data-testid="admin-project-youtube" />
+        </label>
+
+        {form.youtube_url && getYoutubeEmbedUrl(form.youtube_url) && (
+          <div style={{ marginTop: 15, marginBottom: 15 }}>
+            <span className="section-kicker">VIDEO PREVIEW</span>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 8, border: '1px solid var(--line)' }}>
+              <iframe
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                src={getYoutubeEmbedUrl(form.youtube_url)}
+                title="YouTube video preview"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
         <label>Suitable years (comma-separated)<input value={form.suitable_years} onChange={e => set('suitable_years', e.target.value)} placeholder="3rd Year, Final Year" data-testid="admin-project-years" /></label>
         <label>Technologies (comma-separated)<input value={form.technologies} onChange={e => set('technologies', e.target.value)} placeholder="Python, FastAPI, LangChain" data-testid="admin-project-tech" /></label>
         <label>Features (one per line)<textarea rows={4} value={form.features} onChange={e => set('features', e.target.value)} style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: 13 }} data-testid="admin-project-features" /></label>
         <label>Deliverables (one per line)<textarea rows={4} value={form.deliverables} onChange={e => set('deliverables', e.target.value)} style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: 13 }} data-testid="admin-project-deliverables" /></label>
         <label>Learning outcomes (one per line)<textarea rows={3} value={form.learning_outcomes} onChange={e => set('learning_outcomes', e.target.value)} style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: 13 }} data-testid="admin-project-learning" /></label>
+        
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 17 }}>
           <label>Price (₹)<input type="number" min={0} value={form.price} onChange={e => set('price', e.target.value)} data-testid="admin-project-price" /></label>
           <label>Discount price (₹)<input type="number" min={0} value={form.discount_price || ''} onChange={e => set('discount_price', e.target.value)} data-testid="admin-project-discount" /></label>
           <label>Accent<input value={form.accent} onChange={e => set('accent', e.target.value)} data-testid="admin-project-accent" /></label>
         </div>
-        <div style={{ display: 'flex', gap: 22 }}>
-          <label style={{ display: 'flex', gap: 8 }}><input type="checkbox" checked={form.featured} onChange={e => set('featured', e.target.checked)} data-testid="admin-project-featured" /> Featured</label>
-          <label style={{ display: 'flex', gap: 8 }}><input type="checkbox" checked={form.popular} onChange={e => set('popular', e.target.checked)} data-testid="admin-project-popular" /> Popular</label>
-          <label style={{ display: 'flex', gap: 8 }}>Status
+
+        <div style={{ display: 'flex', gap: 22, marginTop: 15, marginBottom: 15 }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={form.featured} onChange={e => set('featured', e.target.checked)} data-testid="admin-project-featured" /> Featured</label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={form.popular} onChange={e => set('popular', e.target.checked)} data-testid="admin-project-popular" /> Popular</label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>Status
             <select value={form.status} onChange={e => set('status', e.target.value)} data-testid="admin-project-status" style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: '4px 10px' }}>
               <option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
             </select>
           </label>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+
+        <div style={{ display: 'flex', gap: 12, marginTop: 25 }}>
           <button className="primary-btn" type="submit" disabled={busy} data-testid="admin-project-save">{busy ? 'Saving…' : 'Save project'} <ArrowRight size={16} /></button>
           <Link to="/admin/projects" className="outline-btn" data-testid="admin-project-cancel">Cancel</Link>
         </div>
@@ -946,6 +1063,83 @@ function AdminEmpty({ tab, title, body }) {
     <AdminShell tab={tab}>
       <div className="dashboard-top"><div><span className="section-kicker">{tab.toUpperCase()}</span><h1>{title}</h1></div></div>
       <div className="empty-state" style={{ marginTop: 30 }}><Sparkles size={26} /><h3>Coming next</h3><p>{body}</p></div>
+    </AdminShell>
+  );
+}
+
+function AdminUsers() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    apiGet('/admin/users')
+      .then(r => setUsers(r.data || []))
+      .catch(() => setUsers([]))
+      .finally(() => setLoading(false));
+  }, []);
+  return (
+    <AdminShell tab="users">
+      <div className="dashboard-top">
+        <div><span className="section-kicker">STUDENTS</span><h1>Active student profiles.</h1></div>
+      </div>
+      {loading ? (
+        <div className="loading-state"><span></span></div>
+      ) : users.length === 0 ? (
+        <div className="empty-state"><h3>No students registered yet</h3><p>Student accounts sync automatically from Supabase Auth.</p></div>
+      ) : (
+        <div className="dashboard-list">
+          {users.map(u => (
+            <div className="purchase-row" key={u.id} data-testid={`admin-user-row-${u.email}`}>
+              <div className="mini-visual" style={{ '--accent': '#2F6B4F' }}><User size={18} /></div>
+              <div>
+                <b>{u.full_name || 'Anonymous User'}</b>
+                <span>{u.email} · Registered {new Date(u.created_at).toLocaleDateString()} · {u.role}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </AdminShell>
+  );
+}
+
+function AdminOrders() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    apiGet('/admin/orders')
+      .then(r => setOrders(r.data || []))
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, []);
+  return (
+    <AdminShell tab="orders">
+      <div className="dashboard-top">
+        <div><span className="section-kicker">SALES / ORDERS</span><h1>Purchase history.</h1></div>
+      </div>
+      {loading ? (
+        <div className="loading-state"><span></span></div>
+      ) : orders.length === 0 ? (
+        <div className="empty-state"><h3>No orders yet</h3><p>Order transactions will list here in real time.</p></div>
+      ) : (
+        <div className="dashboard-list">
+          {orders.map(o => (
+            <div className="purchase-row" key={o.id} data-testid={`admin-order-row-${o.id}`} style={{ display: 'flex', alignItems: 'center' }}>
+              <div className="mini-visual" style={{ '--accent': o.status === 'paid' ? '#2F6B4F' : '#E4572E' }}>
+                <ShoppingBag size={18} />
+              </div>
+              <div style={{ flexGrow: 1 }}>
+                <b>Order #{o.id.slice(0, 8)}...</b>
+                <span>
+                  Buyer: {o.buyer?.full_name || 'Unknown'} ({o.buyer?.email || 'N/A'}) · {money(o.amount_paise / 100)} · {o.status.toUpperCase()}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {new Date(o.created_at).toLocaleDateString()}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </AdminShell>
   );
 }
@@ -1008,8 +1202,8 @@ function AppInner() {
       <Route path="/admin/projects" element={<RequireAuth admin><AdminProjects /></RequireAuth>} />
       <Route path="/admin/projects/new" element={<RequireAuth admin><AdminProjectForm mode="new" /></RequireAuth>} />
       <Route path="/admin/projects/:slug/edit" element={<RequireAuth admin><AdminProjectForm mode="edit" /></RequireAuth>} />
-      <Route path="/admin/orders" element={<RequireAuth admin><AdminEmpty tab="orders" title="Orders" body="Order rows will populate here once Razorpay is enabled and purchases start flowing through the platform." /></RequireAuth>} />
-      <Route path="/admin/users" element={<RequireAuth admin><AdminEmpty tab="users" title="Users" body="Student accounts sync automatically from Supabase Auth. Detailed profile management is the next admin surface to ship." /></RequireAuth>} />
+      <Route path="/admin/orders" element={<RequireAuth admin><AdminOrders /></RequireAuth>} />
+      <Route path="/admin/users" element={<RequireAuth admin><AdminUsers /></RequireAuth>} />
       <Route path="/admin/analytics" element={<RequireAuth admin><AdminEmpty tab="analytics" title="Analytics" body="Detailed traffic, sales and product analytics land here next — powered by the analytics_events table." /></RequireAuth>} />
       <Route path="/admin/seo" element={<RequireAuth admin><AdminEmpty tab="seo" title="SEO" body="Global and per-project SEO overrides will be editable here. Sitemap and structured data ship next." /></RequireAuth>} />
 
