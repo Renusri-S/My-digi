@@ -13,6 +13,8 @@ import razorpay
 import jwt
 from jwt import PyJWKClient
 from supabase import create_client as create_supabase_client
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -574,6 +576,29 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+# Serve React static files in production / fallback environment
+FRONTEND_BUILD_DIR = ROOT_DIR.parent / "frontend" / "build"
+if FRONTEND_BUILD_DIR.exists():
+    app.mount("/static", StaticFiles(directory=FRONTEND_BUILD_DIR / "static"), name="static")
+
+    @app.get("/{fallback_path:path}")
+    async def serve_frontend(fallback_path: str):
+        if fallback_path.startswith("api"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        file_path = FRONTEND_BUILD_DIR / fallback_path
+        try:
+            resolved_path = file_path.resolve()
+            if resolved_path.is_file() and FRONTEND_BUILD_DIR.resolve() in resolved_path.parents:
+                return FileResponse(file_path)
+        except Exception:
+            pass
+
+        index_file = FRONTEND_BUILD_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Frontend build index.html not found")
 
 
 @app.on_event('shutdown')
