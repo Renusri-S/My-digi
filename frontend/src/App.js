@@ -7,6 +7,7 @@ import { Toaster, toast } from 'sonner';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { supabase, supabaseEnabled } from '@/lib/supabase';
 import { listProjects, getProject, listUserPurchases, hasPurchased, upsertProject, deleteProject } from '@/lib/projectsRepo';
+import { listBlogs, getBlog, upsertBlog, deleteBlog } from '@/lib/blogsRepo';
 import { apiGet, apiPost } from '@/lib/api';
 
 const money = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -71,12 +72,11 @@ function Nav({ cartCount }) {
     <header className="nav" data-testid="site-navigation">
       <div className="nav-inner">
         <Link to="/" className="brand" data-testid="brand-home">
-          <span className="brand-mark">S</span><span>studium<span className="brand-dot">.</span></span>
+          <span className="brand-mark">B</span><span>BuildGrads<span className="brand-dot">.</span></span>
         </Link>
         <nav className={`desktop-links ${open ? 'mobile-open' : ''}`} data-testid="primary-navigation">
           <Link to="/projects" data-testid="nav-projects">Projects</Link>
-          <a href="/#categories" data-testid="nav-categories">Categories</a>
-          <a href="/#how-it-works" data-testid="nav-how-it-works">How it works</a>
+          <Link to="/blogs" data-testid="nav-blogs">Blogs</Link>
           <a href="/#about" data-testid="nav-about">About</a>
           {isAdmin && <Link to="/admin" data-testid="nav-admin">Admin</Link>}
         </nav>
@@ -140,6 +140,21 @@ function Home({ onAdd }) {
   return (
     <Shell>
       <main>
+        <div className="home-sub-nav" style={{
+          position: 'sticky',
+          top: '64px',
+          background: 'var(--paper)',
+          borderBottom: '1px solid var(--line)',
+          zIndex: 40,
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '30px'
+        }}>
+          <a href="#categories" style={{ fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', color: 'var(--muted)' }}>01 / Categories</a>
+          <a href="#featured" style={{ fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', color: 'var(--muted)' }}>02 / Featured Projects</a>
+          <a href="#about" style={{ fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', color: 'var(--muted)' }}>03 / About</a>
+        </div>
         <section className="hero">
           <div className="hero-copy">
             <div className="overline"><span className="pulse"></span> A better way to build your final project</div>
@@ -165,7 +180,7 @@ function Home({ onAdd }) {
               <div className="preview-sidebar"><span className="side-active">01</span><span>02</span><span>03</span><span>04</span></div>
               <div className="preview-code">
                 <span className="code-muted">// your next project starts here</span>
-                <span><b className="c-orange">const</b> project = <b className="c-blue">await</b> <b className="c-green">studium</b>.get(</span>
+                <span><b className="c-orange">const</b> project = <b className="c-blue">await</b> <b className="c-green">buildgrads</b>.get(</span>
                 <span className="indent"><b className="c-orange">'neural-notes'</b>);</span><br />
                 <span><b className="c-blue">return</b> project.<b className="c-green">readyToRun</b>;</span>
                 <div className="code-card">
@@ -201,7 +216,7 @@ function Home({ onAdd }) {
           </div>
         </section>
 
-        <section className="section featured-section">
+        <section className="section featured-section" id="featured">
           <div className="section-head">
             <div><span className="section-kicker">02 / CURATED FOR YOU</span><h2>Start with something real.</h2></div>
             <span className="result-note">{loading ? 'Loading…' : `${projects.length} projects in the library`}</span>
@@ -209,19 +224,10 @@ function Home({ onAdd }) {
           <div className="project-grid">{projects.slice(0, 3).map(p => <ProjectCard key={p.slug} project={p} onAdd={onAdd} />)}</div>
         </section>
 
-        <section className="process-section" id="how-it-works">
-          <div className="section-head"><div><span className="section-kicker">03 / THE STUDIUM METHOD</span><h2>Less hunting. More building.</h2></div></div>
-          <div className="process-grid">
-            {[['01','Explore','Find a project that matches your stack, year and ambition.'],['02','Understand','See exactly what is included before you commit.'],['03','Build & present','Run it locally, learn the why, and make it yours.']].map(([n, t, d]) => (
-              <div className="process-item" key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p><ArrowRight size={18} /></div>
-            ))}
-          </div>
-        </section>
-
         <section className="quote-section">
           <div className="quote-mark">"</div>
           <blockquote>Good projects do more than pass a review.<br /><em>They give you something to talk about.</em></blockquote>
-          <span className="quote-credit">— The Studium principle</span>
+          <span className="quote-credit">— The BuildGrads principle</span>
         </section>
       </main>
       <Footer />
@@ -492,7 +498,7 @@ function Checkout({ items }) {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_TQ2d5SX8BCSkS2',
         amount: body.amount,
         currency: body.currency || 'INR',
-        name: 'Studium Labs',
+        name: 'BuildGrads Labs',
         description: 'Digital Project Purchase',
         order_id: body.razorpay_order_id,
         handler: async function (response) {
@@ -594,13 +600,13 @@ function Login() {
     <Shell>
       <main className="auth-page">
         <div className="auth-aside">
-          <span className="brand-mark large">S</span>
+          <span className="brand-mark large">B</span>
           <h1>Build something<br /><em>worth explaining.</em></h1>
           <p>Sign in to access your purchases, downloads and learning path.</p>
         </div>
         <form className="auth-form" onSubmit={submit}>
           <span className="section-kicker">WELCOME BACK</span>
-          <h2>Log in to Studium</h2>
+          <h2>Log in to BuildGrads</h2>
           <label>Email address<input type="email" required placeholder="you@university.edu" value={email} onChange={e => setEmail(e.target.value)} data-testid="login-email" /></label>
           <label>Password<input type="password" required placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} data-testid="login-password" /></label>
           <button className="primary-btn full-btn" type="submit" disabled={busy} data-testid="login-submit">{busy ? 'Signing in…' : 'Continue'} <ArrowRight size={16} /></button>
@@ -631,12 +637,12 @@ function Register() {
     <Shell>
       <main className="auth-page">
         <div className="auth-aside">
-          <span className="brand-mark large">S</span>
+          <span className="brand-mark large">B</span>
           <h1>Start with a<br /><em>real project.</em></h1>
           <p>Create your student workspace and keep every purchase in one place.</p>
         </div>
         <form className="auth-form" onSubmit={submit}>
-          <span className="section-kicker">JOIN STUDIUM</span>
+          <span className="section-kicker">JOIN BUILDGRADS</span>
           <h2>Create your account</h2>
           <label>Full name<input required placeholder="Alex Morgan" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} data-testid="register-name" /></label>
           <label>Email address<input type="email" required placeholder="you@university.edu" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="register-email" /></label>
@@ -797,6 +803,7 @@ function AdminShell({ tab, children }) {
   const items = [
     ['overview', 'Overview', LayoutDashboard],
     ['projects', 'Projects', BookOpen],
+    ['blogs', 'Blogs', BookOpen],
     ['orders', 'Orders', ShoppingBag],
     ['users', 'Users', User],
     ['analytics', 'Analytics', BarChart3],
@@ -1149,16 +1156,16 @@ function Footer() {
     <footer id="about">
       <div className="footer-main">
         <div>
-          <Link to="/" className="brand inverse"><span className="brand-mark">S</span><span>studium<span className="brand-dot">.</span></span></Link>
+          <Link to="/" className="brand inverse"><span className="brand-mark">B</span><span>BuildGrads<span className="brand-dot">.</span></span></Link>
           <p>Real projects for the<br />people building tomorrow.</p>
         </div>
         <div className="footer-links">
-          <div><b>Explore</b><Link to="/projects">All projects</Link><a href="#categories">Categories</a><a href="#how-it-works">How it works</a></div>
-          <div><b>Company</b><a href="#about">About us</a><a href="mailto:hello@studium.example">Contact</a><Link to="/login">Student login</Link></div>
+          <div><b>Explore</b><Link to="/projects">All projects</Link><a href="#categories">Categories</a><Link to="/blogs">Blogs</Link></div>
+          <div><b>Company</b><a href="#about">About us</a><a href="mailto:hello@buildgrads.example">Contact</a><Link to="/login">Student login</Link></div>
           <div><b>Legal</b><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/refund-policy">Refund policy</Link></div>
         </div>
       </div>
-      <div className="footer-bottom"><span>© 2025 Studium Labs</span><span>Built for learning. Made to present.</span></div>
+      <div className="footer-bottom"><span>© 2025 BuildGrads Labs</span><span>Built for learning. Made to present.</span></div>
     </footer>
   );
 }
@@ -1176,6 +1183,328 @@ function LegalPage({ title, body }) {
   );
 }
 
+// ---------- Blogs Components ----------
+function BlogsPage() {
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listBlogs().then(setBlogs).finally(() => setLoading(false));
+  }, []);
+
+  const featuredBlog = blogs[0];
+  const olderBlogs = blogs.slice(1);
+
+  return (
+    <Shell>
+      <main className="catalog-page" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+        <span className="section-kicker">COMMUNITY & INSIGHTS</span>
+        <h1 style={{ marginBottom: '10px' }}>BuildGrads Blogs<span className="brand-dot">.</span></h1>
+        <p style={{ color: 'var(--muted)', marginBottom: '40px', maxWidth: '600px', fontSize: '15px', lineHeight: '1.6' }}>
+          Stay updated with the latest in student development, project tips, AI breakthroughs, and campus service insights.
+        </p>
+
+        {loading ? (
+          <div className="loading-state" style={{ minHeight: '200px' }}><span></span><span></span></div>
+        ) : blogs.length === 0 ? (
+          <div className="empty-state" style={{ padding: '60px 0' }}>
+            <BookOpen size={36} style={{ color: 'var(--muted)', marginBottom: '15px' }} />
+            <h3>No blogs found</h3>
+            <p>Blogs will appear here once seeded or created by the admin.</p>
+          </div>
+        ) : (
+          <>
+            {featuredBlog && (
+              <article className="featured-blog-hero" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: '30px',
+                marginBottom: '60px',
+                padding: '24px',
+                border: '1px solid var(--line)',
+                background: 'var(--surface)',
+                borderRadius: '12px'
+              }}>
+                {featuredBlog.image_url && (
+                  <div style={{ borderRadius: '8px', overflow: 'hidden', height: '350px', background: 'var(--line)' }}>
+                    <img src={featuredBlog.image_url} alt={featuredBlog.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                )}
+                <div>
+                  <span className="section-kicker" style={{ fontSize: '0.75rem' }}>LATEST POST · {new Date(featuredBlog.created_at).toLocaleDateString()}</span>
+                  <h2 style={{ fontSize: '2rem', marginTop: '10px', marginBottom: '15px' }}>{featuredBlog.title}</h2>
+                  <p style={{ color: 'var(--muted)', lineHeight: '1.6', marginBottom: '20px', fontSize: '15px' }}>
+                    {featuredBlog.body.slice(0, 220)}...
+                  </p>
+                  <Link to={`/blogs/${featuredBlog.slug}`} className="primary-btn" style={{ display: 'inline-flex', alignSelf: 'start' }}>
+                    Read full post <ArrowRight size={16} style={{ marginLeft: '8px' }} />
+                  </Link>
+                </div>
+              </article>
+            )}
+
+            {olderBlogs.length > 0 && (
+              <div>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '24px', borderBottom: '1px solid var(--line)', paddingBottom: '10px' }}>Older Posts</h2>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                  gap: '30px'
+                }}>
+                  {olderBlogs.map(b => (
+                    <article key={b.slug} className="project-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                      {b.image_url && (
+                        <div style={{ height: '180px', overflow: 'hidden', borderBottom: '1px solid var(--line)' }}>
+                          <img src={b.image_url} alt={b.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      )}
+                      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                        <span className="eyebrow" style={{ fontSize: '0.75rem' }}>{new Date(b.created_at).toLocaleDateString()}</span>
+                        <Link to={`/blogs/${b.slug}`} style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '10px 0', textDecoration: 'none', color: 'var(--ink)' }}>
+                          {b.title}
+                        </Link>
+                        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: '1.5', flexGrow: 1 }}>
+                          {b.body.slice(0, 100)}...
+                        </p>
+                        <Link to={`/blogs/${b.slug}`} style={{ display: 'inline-flex', alignItems: 'center', marginTop: '15px', fontWeight: '600', color: 'var(--signal)' }}>
+                          Read more <ChevronRight size={16} />
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </Shell>
+  );
+}
+
+function BlogDetailPage() {
+  const { slug } = useParams();
+  const [blog, setBlog] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getBlog(slug)
+      .then(setBlog)
+      .catch(() => setBlog(false))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  if (blog === false) {
+    return (
+      <Shell>
+        <div className="empty-state page-empty">
+          <h2>Blog post not found</h2>
+          <Link to="/blogs" className="primary-btn">Back to blogs</Link>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Shell>
+        <div className="loading-state page-empty">
+          <span></span><span></span>
+        </div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell>
+      <main className="detail-page" style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
+        <div className="breadcrumbs">
+          <Link to="/blogs">Blogs</Link><ChevronRight size={13} /><span>{blog.title}</span>
+        </div>
+
+        <span className="section-kicker">POSTED ON {new Date(blog.created_at).toLocaleDateString()}</span>
+        <h1 style={{ fontSize: '2.5rem', marginTop: '10px', marginBottom: '24px', lineHeight: '1.2' }}>{blog.title}</h1>
+
+        {blog.image_url && (
+          <div style={{ borderRadius: '12px', overflow: 'hidden', height: '400px', marginBottom: '32px', border: '1px solid var(--line)' }}>
+            <img src={blog.image_url} alt={blog.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+
+        <div style={{ fontSize: '1.1rem', lineHeight: '1.75', color: 'var(--ink)', whiteSpace: 'pre-wrap', marginBottom: '40px' }}>
+          {blog.body}
+        </div>
+
+        {blog.video_url && (
+          <div style={{ marginTop: '40px', borderTop: '1px solid var(--line)', paddingTop: '32px' }}>
+            <span className="section-kicker">RELATED VIDEO</span>
+            <h3 style={{ marginBottom: '20px' }}>Watch Video Guide</h3>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--line)' }}>
+              <iframe
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                src={getYoutubeEmbedUrl(blog.video_url)}
+                title="YouTube video"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: '50px', borderTop: '1px solid var(--line)', paddingTop: '20px', display: 'flex', justifyContent: 'space-between' }}>
+          <Link to="/blogs" className="outline-btn"><ArrowRight size={15} style={{ transform: 'rotate(180deg)', marginRight: '8px' }} /> Back to blogs</Link>
+        </div>
+      </main>
+    </Shell>
+  );
+}
+
+function AdminBlogs() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const reload = () => {
+    setLoading(true);
+    listBlogs().then(r => setRows(r || [])).finally(() => setLoading(false));
+  };
+  useEffect(reload, []);
+
+  const remove = async (row) => {
+    if (!window.confirm(`Delete ${row.title}?`)) return;
+    try {
+      await deleteBlog(row.id);
+      toast.success('Blog post removed');
+      reload();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
+
+  return (
+    <AdminShell tab="blogs">
+      <div className="dashboard-top">
+        <div><span className="section-kicker">BLOGS SECTION</span><h1>Manage blog posts.</h1></div>
+        <Link to="/admin/blogs/new" className="primary-btn" data-testid="admin-new-blog"><Plus size={16} /> New blog</Link>
+      </div>
+      {loading ? (
+        <div className="loading-state"><span></span></div>
+      ) : rows.length === 0 ? (
+        <div className="empty-state"><h3>No blog posts yet</h3><p>Create your first blog post to publish it in the blogs section.</p></div>
+      ) : (
+        <div className="dashboard-list">
+          {rows.map(b => (
+            <div className="purchase-row" key={b.slug} data-testid={`admin-blog-row-${b.slug}`}>
+              <div className="mini-visual" style={{ '--accent': '#E4572E' }}><BookOpen size={18} /></div>
+              <div style={{ flexGrow: 1 }}><b>{b.title}</b><span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)' }}>/{b.slug} · Published {new Date(b.created_at).toLocaleDateString()}</span></div>
+              <Link to={`/admin/blogs/${b.id}/edit`} className="outline-btn" style={{ marginRight: '10px' }} data-testid={`admin-edit-blog-${b.slug}`}>Edit <ArrowRight size={14} /></Link>
+              <button className="outline-btn" onClick={() => remove(b)} data-testid={`admin-delete-blog-${b.slug}`}><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </AdminShell>
+  );
+}
+
+function AdminBlogForm({ mode }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [form, setForm] = useState({
+    slug: '', title: '', body: '', image_url: '', video_url: ''
+  });
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(mode === 'edit');
+
+  useEffect(() => {
+    if (mode === 'edit' && id) {
+      getBlog(id).then(p => {
+        if (p) {
+          setForm({
+            slug: p.slug,
+            title: p.title,
+            body: p.body,
+            image_url: p.image_url || '',
+            video_url: p.video_url || ''
+          });
+        }
+      }).finally(() => setLoading(false));
+    }
+  }, [mode, id]);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!supabaseEnabled) {
+      toast.error('Supabase is not configured. Paste URL directly.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const fileName = `blog_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const filePath = `blogs/${fileName}`;
+      const { error } = await supabase.storage.from('thumbnails').upload(filePath, file);
+      if (error) throw error;
+      
+      const { data } = supabase.storage.from('thumbnails').getPublicUrl(filePath);
+      if (data?.publicUrl) {
+        setForm(f => ({ ...f, image_url: data.publicUrl }));
+        toast.success('Image uploaded successfully!');
+      } else {
+        throw new Error('Failed to retrieve public URL');
+      }
+    } catch (err) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const payload = {
+        ...form,
+        slug: form.slug.trim(),
+        title: form.title.trim()
+      };
+      if (mode === 'edit') {
+        payload.id = id;
+      }
+      await upsertBlog(payload);
+      toast.success('Blog post saved successfully');
+      navigate('/admin/blogs');
+    } catch (err) {
+      toast.error(err.message || 'Failed to save blog post');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <AdminShell tab="blogs"><div className="loading-state"><span></span></div></AdminShell>;
+
+  return (
+    <AdminShell tab="blogs">
+      <div className="dashboard-top"><div><span className="section-kicker">{mode === 'edit' ? 'EDIT' : 'CREATE'}</span><h1>{mode === 'edit' ? form.title : 'New blog post'}</h1></div></div>
+      <form className="auth-form" onSubmit={submit} style={{ maxWidth: 720, marginTop: 32 }}>
+        <label>Title<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} data-testid="admin-blog-title" /></label>
+        <label>Slug<input required value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} data-testid="admin-blog-slug" /></label>
+        <label>Image URL (optional)
+          <input value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} data-testid="admin-blog-image" placeholder="https://..." />
+          <span style={{ fontSize: '0.8rem', color: 'var(--muted)', display: 'block', marginTop: 4 }}>Or select a file to upload:</span>
+          <input type="file" accept="image/*" onChange={handleImageUpload} style={{ marginTop: 2, fontSize: '0.85rem' }} />
+        </label>
+        <label>YouTube Video URL (optional)<input value={form.video_url} onChange={e => setForm({ ...form, video_url: e.target.value })} data-testid="admin-blog-video" placeholder="https://www.youtube.com/watch?v=..." /></label>
+        <label>Body Content<textarea required rows={10} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} style={{ background: 'var(--surface)', border: '1px solid var(--line)', padding: 13 }} data-testid="admin-blog-body" /></label>
+        
+        <div style={{ display: 'flex', gap: 12, marginTop: 25 }}>
+          <button className="primary-btn" type="submit" disabled={busy} data-testid="admin-blog-save">{busy ? 'Saving…' : 'Save blog'} <ArrowRight size={16} /></button>
+          <Link to="/admin/blogs" className="outline-btn">Cancel</Link>
+        </div>
+      </form>
+    </AdminShell>
+  );
+}
+
+
 // ---------- Root ----------
 function AppInner() {
   const [items, setItems] = useState([]);
@@ -1192,6 +1521,8 @@ function AppInner() {
       <Route path="/projects/:slug" element={<Detail onAdd={add} />} />
       <Route path="/cart" element={<Cart items={items} setItems={setItems} />} />
       <Route path="/checkout" element={<RequireAuth><Checkout items={items} /></RequireAuth>} />
+      <Route path="/blogs" element={<BlogsPage />} />
+      <Route path="/blogs/:slug" element={<BlogDetailPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
@@ -1202,14 +1533,17 @@ function AppInner() {
       <Route path="/admin/projects" element={<RequireAuth admin><AdminProjects /></RequireAuth>} />
       <Route path="/admin/projects/new" element={<RequireAuth admin><AdminProjectForm mode="new" /></RequireAuth>} />
       <Route path="/admin/projects/:slug/edit" element={<RequireAuth admin><AdminProjectForm mode="edit" /></RequireAuth>} />
+      <Route path="/admin/blogs" element={<RequireAuth admin><AdminBlogs /></RequireAuth>} />
+      <Route path="/admin/blogs/new" element={<RequireAuth admin><AdminBlogForm mode="new" /></RequireAuth>} />
+      <Route path="/admin/blogs/:id/edit" element={<RequireAuth admin><AdminBlogForm mode="edit" /></RequireAuth>} />
       <Route path="/admin/orders" element={<RequireAuth admin><AdminOrders /></RequireAuth>} />
       <Route path="/admin/users" element={<RequireAuth admin><AdminUsers /></RequireAuth>} />
       <Route path="/admin/analytics" element={<RequireAuth admin><AdminEmpty tab="analytics" title="Analytics" body="Detailed traffic, sales and product analytics land here next — powered by the analytics_events table." /></RequireAuth>} />
       <Route path="/admin/seo" element={<RequireAuth admin><AdminEmpty tab="seo" title="SEO" body="Global and per-project SEO overrides will be editable here. Sitemap and structured data ship next." /></RequireAuth>} />
 
-      <Route path="/privacy" element={<LegalPage title="Privacy" body="Studium Labs collects only the minimum data required to run your account and deliver purchased projects. No personal data is sold. Contact hello@studium.example for any privacy question." />} />
+      <Route path="/privacy" element={<LegalPage title="Privacy" body="BuildGrads Labs collects only the minimum data required to run your account and deliver purchased projects. No personal data is sold. Contact hello@buildgrads.example for any privacy question." />} />
       <Route path="/terms" element={<LegalPage title="Terms" body="All projects are provided for educational and learning purposes. You are responsible for complying with your institution's academic honesty policies when using any purchased material." />} />
-      <Route path="/refund-policy" element={<LegalPage title="Refund policy" body="Because Studium Labs delivers digital assets immediately after payment, refunds are considered case-by-case within 48 hours of purchase for demonstrably broken deliverables." />} />
+      <Route path="/refund-policy" element={<LegalPage title="Refund policy" body="Because BuildGrads Labs delivers digital assets immediately after payment, refunds are considered case-by-case within 48 hours of purchase for demonstrably broken deliverables." />} />
     </Routes>
   );
 }

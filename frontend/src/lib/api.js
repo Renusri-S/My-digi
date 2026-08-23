@@ -19,3 +19,13 @@ export const apiPost = async (path, body, config = {}) => {
   const headers = { ...(config.headers || {}), ...(await authHeaders()) };
   return axios.post(`${API}${path}`, body, { ...config, headers });
 };
+
+export const apiPut = async (path, body, config = {}) => {
+  const headers = { ...(config.headers || {}), ...(await authHeaders()) };
+  return axios.put(`${API}${path}`, body, { ...config, headers });
+};
+
+export const apiDelete = async (path, config = {}) => {
+  const headers = { ...(config.headers || {}), ...(await authHeaders()) };
+  return axios.delete(`${API}${path}`, { ...config, headers });
+};

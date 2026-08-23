@@ -11,7 +11,7 @@ export const supabase = supabaseEnabled
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'studium-auth',
+        storageKey: 'buildgrads-auth',
       },
     })
   : null;

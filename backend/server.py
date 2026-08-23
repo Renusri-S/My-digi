@@ -37,10 +37,10 @@ rzp_client = None
 if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     rzp_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
-log = logging.getLogger('studium')
+log = logging.getLogger('buildgrads')
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title='Studium Labs Marketplace API')
+app = FastAPI(title='BuildGrads Labs Marketplace API')
 api_router = APIRouter(prefix='/api')
 
 
@@ -101,6 +101,23 @@ SEED_PROJECTS = [
 ]
 CATEGORIES = [{'name': n, 'slug': n.lower().replace(' / ', '-').replace(' ', '-')} for n in ['AI / ML','Generative AI','Computer Vision','Full Stack','Data Science','NLP']]
 
+SEED_BLOGS = [
+    {
+        "slug": "getting-started-with-ai-agents",
+        "title": "Getting Started with AI Agents in 2026",
+        "body": "AI agents are transforming how we build software, manage projects, and automate tasks. In this post, we discuss the core concepts of agentic design, tool calling pattern, and feedback loops.",
+        "image_url": "https://images.unsplash.com/photo-1541178735493-479c1a27ed24?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    },
+    {
+        "slug": "why-explainable-cv-matters",
+        "title": "Why Explainable Computer Vision Matters",
+        "body": "Explainability is crucial when deploying computer vision algorithms in production. Learn how object counting pipelines work, how bounding boxes are drawn, and how confidence score thresholds affect predictions.",
+        "image_url": "https://images.unsplash.com/photo-1583037825390-a23eee53f6ef?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "video_url": ""
+    }
+]
+
 
 async def ensure_seed():
     now = datetime.now(timezone.utc).isoformat()
@@ -116,6 +133,8 @@ async def ensure_seed():
                     'source_zip_path': p['source_zip_path']
                 }}
             )
+    if await db.blogs.count_documents({}) == 0:
+        await db.blogs.insert_many([{**b, 'id': str(uuid.uuid4()), 'created_at': now, 'updated_at': now} for b in SEED_BLOGS])
 
 
 # ---------- Models ----------
@@ -129,11 +148,18 @@ class VerifyPaymentRequest(BaseModel):
     razorpay_signature: str
     order_id: str
 
+class BlogRequest(BaseModel):
+    title: str
+    slug: str
+    body: str
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
 
 # ---------- Public endpoints ----------
 @api_router.get('/')
 async def root():
-    return {'message': 'Studium Labs API', 'status': 'ready',
+    return {'message': 'BuildGrads Labs API', 'status': 'ready',
             'supabase_configured': bool(SUPABASE_URL),
             'signed_downloads_enabled': bool(SUPA_ADMIN)}
 
@@ -158,7 +184,7 @@ async def projects(search: str = '', category: str = '', complexity: str = '', s
 @api_router.get('/projects/{slug}')
 async def project(slug: str):
     await ensure_seed()
-    if slug == 'studium-labs':
+    if slug in ['studium-labs', 'buildgrads-labs']:
         slug = 'neural-notes'
     doc = await db.projects.find_one({'slug': slug}, {'_id': 0})
     if not doc:
@@ -169,6 +195,28 @@ async def project(slug: str):
 @api_router.get('/categories')
 async def categories():
     return CATEGORIES
+
+
+# ---------- Blogs public endpoints ----------
+@api_router.get('/blogs')
+async def list_blogs():
+    await ensure_seed()
+    docs = await db.blogs.find({}, {'_id': 0}).to_list(100)
+    # Sort by created_at descending
+    docs.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return docs
+
+
+@api_router.get('/blogs/{slug}')
+async def get_blog(slug: str):
+    await ensure_seed()
+    doc = await db.blogs.find_one({'slug': slug}, {'_id': 0})
+    if not doc:
+        # Also try to find by ID
+        doc = await db.blogs.find_one({'id': slug}, {'_id': 0})
+    if not doc:
+        raise HTTPException(404, 'Blog not found')
+    return doc
 
 
 # ---------- Authenticated endpoints ----------
@@ -184,6 +232,73 @@ async def me(user=Depends(current_user)):
 
 # ---------- Admin ----------
 # ---------- Admin ----------
+# ---------- Blogs admin endpoints ----------
+@api_router.post('/admin/blogs')
+async def create_blog(payload: BlogRequest, user=Depends(require_admin)):
+    await ensure_seed()
+    exists = await db.blogs.find_one({'slug': payload.slug})
+    if exists:
+        raise HTTPException(400, 'Blog with this slug already exists')
+    
+    now = datetime.now(timezone.utc).isoformat()
+    blog_id = str(uuid.uuid4())
+    doc = {
+        'id': blog_id,
+        'slug': payload.slug.strip(),
+        'title': payload.title.strip(),
+        'body': payload.body,
+        'image_url': payload.image_url,
+        'video_url': payload.video_url,
+        'created_at': now,
+        'updated_at': now
+    }
+    await db.blogs.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+@api_router.put('/admin/blogs/{id}')
+async def update_blog(id: str, payload: BlogRequest, user=Depends(require_admin)):
+    await ensure_seed()
+    doc = await db.blogs.find_one({'id': id})
+    if not doc:
+        doc = await db.blogs.find_one({'slug': id})
+    if not doc:
+        raise HTTPException(404, 'Blog not found')
+    
+    slug_taken = await db.blogs.find_one({'slug': payload.slug, 'id': {'$ne': doc['id']}})
+    if slug_taken:
+        raise HTTPException(400, 'Blog with this slug already exists')
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.blogs.update_one(
+        {'id': doc['id']},
+        {'$set': {
+            'slug': payload.slug.strip(),
+            'title': payload.title.strip(),
+            'body': payload.body,
+            'image_url': payload.image_url,
+            'video_url': payload.video_url,
+            'updated_at': now
+        }}
+    )
+    updated = await db.blogs.find_one({'id': doc['id']}, {'_id': 0})
+    return updated
+
+
+@api_router.delete('/admin/blogs/{id}')
+async def delete_blog(id: str, user=Depends(require_admin)):
+    await ensure_seed()
+    doc = await db.blogs.find_one({'id': id})
+    if not doc:
+        doc = await db.blogs.find_one({'slug': id})
+    if not doc:
+        raise HTTPException(404, 'Blog not found')
+    
+    await db.blogs.delete_one({'id': doc['id']})
+    return {'status': 'deleted', 'id': doc['id']}
+
+
 @api_router.get('/admin/overview')
 async def admin_overview(user=Depends(require_admin)):
     await ensure_seed()

@@ -361,5 +361,31 @@ update public.profiles p
  where p.id = u.id
    and lower(u.email) = lower('renusrisiva@gmail.com');
 
+-- ---------- blogs ----------
+create table if not exists public.blogs (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  body text not null,
+  image_url text,
+  video_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- RLS policies for blogs
+alter table public.blogs enable row level security;
+
+drop policy if exists blogs_public_read on public.blogs;
+create policy blogs_public_read on public.blogs
+  for select to anon, authenticated using (true);
+
+drop policy if exists blogs_admin_write on public.blogs;
+create policy blogs_admin_write on public.blogs
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+
 -- Verify (optional):
 -- select id, email, role from public.profiles where role = 'admin';

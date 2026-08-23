@@ -14,6 +14,8 @@ def test_projects_seed_and_shape(client):
 def test_project_detail(client):
     r=client.get(f"{BASE_URL}/api/projects/studium-labs",timeout=15)
     assert r.status_code == 200 and r.json()["slug"]=="neural-notes"
+    r=client.get(f"{BASE_URL}/api/projects/buildgrads-labs",timeout=15)
+    assert r.status_code == 200 and r.json()["slug"]=="neural-notes"
     r=client.get(f"{BASE_URL}/api/projects/neural-notes",timeout=15)
     assert r.status_code == 200 and r.json()["slug"]=="neural-notes"
 
